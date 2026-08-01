@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+vendor/
+.venv/
+__pycache__/
+
+# Build artifacts / compiled outputs
+dist/
+build/
+out/
+*.o
+*.obj
+*.class
+*.pyc
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Temporary / OS files
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# NOTE: ai/ (the AI engineering framework) is intentionally NOT ignored.
+# It must remain version-controlled per Constitution Rule 1.

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p ai/constitution ai/decisions ai/todo ai/changelog ai/session ai/prompts ai/reviews ai/templates docs src)"
+    ],
+    "additionalDirectories": [
+      "D:\\BikEvaluator\\ai"
+    ]
+  }
+}
