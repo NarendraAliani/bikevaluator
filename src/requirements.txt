@@ -1,0 +1,21 @@
+# Full Path: src/requirements.txt
+# Relative Path: requirements.txt
+# Module: bikevaluator (project root)
+# Purpose: Pinned production dependencies (CSS-001: "explicit version
+#   pinning ... no floating versions for direct dependencies").
+# Author: AI Agent (Claude, Sonnet 5)
+# Related Documents: CSS-001, DBD-001 (PostgreSQL), BUS-0001 (Django REST Framework)
+
+# Verified installed and working in this environment (IMP-001A).
+Django==5.2.13
+
+# Pinned for the future API implementation prompt - not imported
+# anywhere yet in this codebase (IMP-001A explicitly excludes REST API
+# implementation). Installed and importable in this environment.
+djangorestframework==3.17.1
+
+# Required for production PostgreSQL (DBD-001) - NOT installed or used
+# in this environment, which runs on SQLite for local dev/test only
+# (see bikevaluator/settings.py). Must be installed before any
+# deployment against a real PostgreSQL database.
+psycopg2-binary==2.9.10

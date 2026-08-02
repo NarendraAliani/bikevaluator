@@ -4,41 +4,45 @@
 
 ## Current phase
 
-Phase 0 — Repository & AI Framework Bootstrap (AEP-001). No domain code
-written yet.
+IMP-001D approved (9.6/10) — Vehicle Master considered architecturally
+stable. ISP-002 (Valuation Engine Implementation Specification)
+drafted, Status: Draft.
 
-## Completed documents
+## Completed documents / code
 
-- `ai/README.md`
-- `ai/constitution/constitution.md` (v1.0.0)
-- `ai/decisions/decisions.md` (DEC-0001..DEC-0003)
-- `ai/todo/todo.md` (starter tasks)
-- `ai/changelog/changelog.md` (bootstrap entry)
-- `ai/prompts/README.md`
+New this round:
+
+- `ai/architecture/isp/ISP-002-valuation-engine-implementation-
+  specification.md` (Status: Draft)
+
+Updated this round:
+
+- `ai/context/context.md`
+- `ai/session/session-state.md`
+- `ai/roadmap/roadmap.md`
+- `ai/todo/modules/valuation.md`
+- `ai/changelog/changelog.md`
 - `ai/prompts/prompt-index.md`
-- `ai/reviews/review-log.md`
-- `ai/templates/prompt-template.md`
-- `ai/templates/decision-template.md`
-- `ai/templates/todo-template.md`
-- `docs/README.md`
-- `.gitignore`
+- `ai/history/prompt-history.md`
+- `ai/review/review-package.md`
+
+No Constitution amendment, no new `ai/decisions/decisions.md` entry —
+ISP-002 introduces no new architectural decision; the Repair Master
+model-sequencing question is resolved as an implementation-sequencing
+choice (explicitly anticipated by FS-002 itself as ISP-level, not
+architecture-level), not a new decision requiring approval.
 
 ## Next document
 
-First functional specification prompt for the BIKEVALUATOR domain
-(bike evaluation criteria, data model, scoring), to be drafted once a human
-provides product requirements.
+Human review of ISP-002 (and explicit FS-002 Status confirmation).
+Then EP-002 (Valuation Engine Engineering Package).
 
 ## Open questions
 
-1. Should production root be `src/` or `app/`? Currently placeholder `src/`
-   per DEC-0003 — needs human confirmation.
-2. What tech stack (frontend/backend/mobile) will BIKEVALUATOR use? Unknown
-   at bootstrap time.
-3. Who are the intended end users and what does "evaluating a bike" mean in
-   this product (used-bike marketplace grading? mechanical inspection
-   checklist? fitness/sizing tool?) — needs clarification before any spec
-   work begins.
+ISP-002's 4 (Repair Master model sequencing — resolved by this ISP;
+FS-005/BR-0006 deferral — refined, not resolved; MSP=0/Margin≥MSP edge
+case; concurrent pricing edit during in-flight calculation — both
+unchanged from FS-002). None block document review.
 
 ## Last update time
 

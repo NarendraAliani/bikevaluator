@@ -1,8 +1,12 @@
-# Review Log — BIKEVALUATOR
+# Review Log — BIKEVALUATOR (Index)
 
-Log of reviews performed on prompts, decisions, or code. Newest at top.
+As of AEP-002, reviews are categorized into subfolders:
+`ai/reviews/architecture/`, `ai/reviews/code/`, `ai/reviews/prompts/`,
+`ai/reviews/security/`, `ai/reviews/qa/`. This file remains as the shared
+entry-format reference and a fallback log for reviews that don't fit a
+category.
 
-Use this structure per entry:
+Use this structure per entry (in this file or any category folder):
 
 ```markdown
 ## REV-<NNNN>

@@ -26,6 +26,10 @@ out/
 .DS_Store
 Thumbs.db
 
+# Django local dev database (settings.py uses SQLite for local dev/test
+# only - production uses PostgreSQL per DBD-001, see IMP-001A)
+src/db.sqlite3
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
