@@ -83,12 +83,25 @@ the dealer's Excel model.
 
 ### Repair Module
 
+**Amended by `AI-0011` (IMP-003, 2026-08-02)** — see that decision for
+full context. The real 2W Valuation Calc spreadsheet showed repair
+deduction amounts vary per Year+Variant, not globally per option; a
+purely global `repair_options.deduction_amount` could not hold that
+data losslessly.
+
 - **repair_components**: id, name (Engine, Colour, Gearbox, Tyre,
-  Plastic, Clutch, Battery [future], Accessories [future]).
+  Plastic, Clutch, Shock/Fork [added `AI-0011`], Battery [future],
+  Accessories [future]).
 - **repair_options**: id, repair_component_id (FK), option_name (OK/
-  Partial/Full), deduction_amount (fixed ₹, confirms BR-0010/ADR-018),
-  **updated_at** (optimistic-concurrency check value, per `ENG-0003`,
-  same policy as `valuation_master`).
+  Partial/Full) — **pure catalog identity only as of `AI-0011`; no
+  longer carries `deduction_amount`.**
+- **valuation_repair_costs** (new, `AI-0011`): id, valuation_master_id
+  (FK, CASCADE), repair_option_id (FK, RESTRICT), deduction_amount
+  (fixed ₹, confirms BR-0010/ADR-018), unique on (valuation_master_id,
+  repair_option_id). Scopes the deduction amount to one Year+Variant
+  pricing version, exactly like `minimum_selling_price`/`margin`. No
+  separate versioning mechanism - a superseded `valuation_master` row
+  keeps its own historical `valuation_repair_costs` rows untouched.
 
 Sibling to Vehicle Master, not nested inside it (resolves BDR-0001 —
 both are Admin-owned modules, Vehicle Master owns catalog+pricing,
@@ -120,6 +133,20 @@ maintenance mode, privacy policy, terms, ad settings.
 
 who, when, old_value, new_value, ip_address — logs all Super Admin
 master-data changes.
+
+**Implemented `AI-0012` (IMP-003B, 2026-08-02):** `audit_logs` table
+(`AuditLog` model) plus `actor_id`, `action`, `entity_type`, `entity_id`,
+`correlation_id`, `request_id`, `success`, `error_message`. Placed
+directly inside `vehicle_master` (not a separate `common/audit` app as
+EP-001 §2 originally planned) - same pragmatic, minimal-footprint call
+already made for `RepairComponent`/`RepairOption` in EP-002, flagged
+again here rather than silently resolved. `PersistentAuditLogRepository`
+replaces `NoOpAuditRepository` as `service_factory`'s default - every
+Admin write path (HTTP and the IMP-003 importer) now creates a real
+record. `correlation_id`/`request_id` are populated ambiently via
+`audit_context.py` (Python `contextvars`) rather than by threading two
+new parameters through eleven existing `VehicleMasterAdminService`
+method signatures - zero existing call sites changed.
 
 ## 3. Entity Relationship Overview
 

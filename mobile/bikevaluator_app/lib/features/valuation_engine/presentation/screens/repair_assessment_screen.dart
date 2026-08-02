@@ -42,7 +42,7 @@ class _RepairAssessmentScreenState extends State<RepairAssessmentScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = ValuationController(ValuationRemoteDataSource(ApiClient()));
+    _controller = ValuationController(ValuationRemoteDataSource(ApiClient.instance));
     _loadComponents();
   }
 
@@ -52,7 +52,10 @@ class _RepairAssessmentScreenState extends State<RepairAssessmentScreen> {
       _errorMessage = null;
     });
     try {
-      final components = await _controller.loadRepairComponents();
+      final components = await _controller.loadRepairComponents(
+        year: widget.year,
+        variantId: widget.variantId,
+      );
       setState(() {
         _components = components;
         _loading = false;
@@ -60,12 +63,14 @@ class _RepairAssessmentScreenState extends State<RepairAssessmentScreen> {
     } on ApiException catch (e) {
       setState(() {
         _loading = false;
-        _errorMessage = e.message;
+        _errorMessage = e.isPricingUnavailable
+            ? 'Pricing is not available for this vehicle/year yet.'
+            : e.userFriendlyMessage;
       });
     } catch (_) {
       setState(() {
         _loading = false;
-        _errorMessage = 'Network error - check your connection and try again.';
+        _errorMessage = 'An unexpected error occurred. Please try again.';
       });
     }
   }
@@ -94,12 +99,12 @@ class _RepairAssessmentScreenState extends State<RepairAssessmentScreen> {
         _submitting = false;
         _errorMessage = e.isPricingUnavailable
             ? 'Pricing is not available for this vehicle/year yet.'
-            : e.message;
+            : e.userFriendlyMessage;
       });
     } catch (_) {
       setState(() {
         _submitting = false;
-        _errorMessage = 'Network error - check your connection and try again.';
+        _errorMessage = 'An unexpected error occurred. Please try again.';
       });
     }
   }

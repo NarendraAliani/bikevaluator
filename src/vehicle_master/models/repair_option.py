@@ -6,19 +6,25 @@
 # Related Documents: DBD-001 §2 (Repair Module - repair_options table),
 #   DDD-001 §3 (RepairOption domain object), BRR-001 BR-0010,
 #   DBD-001 §6a (ENG-0003 - updated_at reserved for a future FS-004
-#   write path, unused by this read-only module), ISP-002 §3, EP-002 §3
+#   write path, unused by this read-only module), ISP-002 §3, EP-002 §3,
+#   IMP-003 (deduction_amount moved to ValuationRepairCost - see that
+#   model's docstring for why)
 import uuid
 
 from django.db import models
 
 from vehicle_master.models.repair_component import RepairComponent
-from vehicle_master.validators import validate_non_negative_amount
 
 
 class RepairOption(models.Model):
     """
     One selectable condition state for a RepairComponent (OK/Partial/
-    Full), with a fixed ₹ deduction (BR-0010) - DDD-001 §3.
+    Full) - DDD-001 §3. Pure catalog identity only: which options exist
+    for a component. The ₹ deduction amount for a given option is no
+    longer stored here (see ``ValuationRepairCost`` - IMP-003 discovered
+    that real deduction amounts vary per Year+Variant, not globally per
+    option, contradicting this table's original DBD-001 §9 design;
+    resolved as a flagged Architecture Observation, not a silent change).
 
     Read-only from this module's (Valuation Engine's) perspective;
     ``updated_at`` is reserved as a future optimistic-concurrency token
@@ -40,12 +46,6 @@ class RepairOption(models.Model):
         related_name="repair_options",
     )
     option_name = models.CharField(max_length=10, choices=OPTION_NAME_CHOICES)
-    deduction_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        validators=[validate_non_negative_amount],
-        help_text="Fixed ₹ deduction (BR-0010) - never a percentage.",
-    )
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,12 +53,6 @@ class RepairOption(models.Model):
     class Meta:
         db_table = "repair_options"
         ordering = ["option_name"]
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(deduction_amount__gte=0),
-                name="chk_repair_option_deduction_non_negative",
-            ),
-        ]
         indexes = [
             models.Index(
                 fields=["repair_component"], name="idx_repair_options_component"

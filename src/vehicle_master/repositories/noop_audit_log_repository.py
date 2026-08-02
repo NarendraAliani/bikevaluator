@@ -42,5 +42,11 @@ class NoOpAuditRepository(AuditLogRepository):
         old_value: Optional[dict],
         new_value: Optional[dict],
         ip_address: str,
+        *,
+        action: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+        success: bool = True,
+        error_message: Optional[str] = None,
     ) -> None:
         return None

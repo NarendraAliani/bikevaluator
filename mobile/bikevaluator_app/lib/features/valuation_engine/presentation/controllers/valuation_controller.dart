@@ -12,8 +12,11 @@ class ValuationController {
 
   final ValuationRemoteDataSource _dataSource;
 
-  Future<List<RepairComponentDto>> loadRepairComponents() =>
-      _dataSource.getRepairComponents();
+  Future<List<RepairComponentDto>> loadRepairComponents({
+    required int year,
+    required String variantId,
+  }) =>
+      _dataSource.getRepairComponents(year: year, variantId: variantId);
 
   Future<ValuationResultDto> calculate({
     required int year,

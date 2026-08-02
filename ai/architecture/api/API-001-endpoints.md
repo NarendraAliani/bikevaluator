@@ -66,9 +66,18 @@ row.
 
 ## Repairs
 
+**Amended by `AI-0011` (IMP-003, 2026-08-02):** repair deduction amounts
+are scoped per Year+Variant (`ValuationRepairCost`), not global per
+option — `/repairs/components` therefore requires `year`/`variant_id`
+query params (previously none) and returns `VAL003`/`E-PRICING-001` if
+no Active `ValuationMaster` exists for that Year+Variant, same as
+`/vehicles/configuration`. This is a breaking change from the endpoint's
+original IMP-002 shape, flagged here rather than left stale (found by
+the IMP-003A review).
+
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/repairs/components` | GET | List repair components + their options |
+| `/repairs/components?year=&variant_id=` | GET | List repair components + their options, with deduction amounts scoped to this vehicle's ValuationMaster |
 
 ## Valuation (core)
 

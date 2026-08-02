@@ -216,6 +216,32 @@ index.
       Valuation Engine has no Super-Admin-only write at all. Flagged
       (again) that FS-002's Status field still reads Draft despite
       being called "approved."
+- [x] EP-002 + IMP-002: Engineering Package + full implementation of
+      the Valuation Engine backend (176 tests) and the **first Flutter
+      code in the repository** (`mobile/bikevaluator_app`) — Vehicle
+      Selector/Repair Assessment/Result screens, end-to-end validated
+      on the Android emulator. One real defect found and fixed during
+      self-review (network-error message masking on Vehicle Selector).
+- [x] IMP-003: imported the architect-supplied real "2W Valuation Calc"
+      spreadsheet (86 rows). Discovered repair costs vary per vehicle,
+      contradicting DBD-001 §9's global design — surfaced via
+      `AskUserQuestion` before coding, resolved as **`AI-0011`**
+      (amends DBD-001 §9/BR-0010). New `ValuationRepairCost` table,
+      idempotent `import_valuation_master` command. 194/194 tests pass.
+- [x] IMP-003A: architect-approved CTO-grade review of IMP-002/IMP-003.
+      Judged the `AI-0011` decision sound; found 2 High Priority
+      engineering-quality gaps (stale API-001/ISP-002/EP-002 docs, no
+      real audit trail) + several Medium/Low (N+1 queries, a redundant
+      index, importer robustness).
+- [x] IMP-003B: Engineering Stabilization Release closing every High
+      Priority finding — real audit trail (**`AI-0012`**, amends
+      DBD-001 §2), N+1 fixes, redundant index removed, importer
+      hardened, Flutter `ApiClient` centralized with timeout + error
+      differentiation, stale docs synced. 211 backend + 11 Flutter
+      tests pass. **Awaiting the architect's decision to officially
+      freeze this foundation** (Architecture + Vehicle Master +
+      Valuation Engine + Data Import + Flutter Client Bootstrap) before
+      FS-003 (Authentication) or FS-004 (Admin) begins.
 
 ## Phase 1 — Core Domain Build-out (module order revised in AEP-003; SDD-000 gate added in AEP-004; BRR-001/API-000 conformance added in AEP-006; NS-001/CSS-001 conformance added in AEP-007; Baseline v1.0 established in ABL-001)
 
@@ -259,11 +285,14 @@ later. Every module FS below must conform to
        **IMP-001D reviewed and APPROVED (9.6/10) — Vehicle Master is
        considered architecturally stable.** No authentication/Flutter
        yet.
-2. [~] FS-002 — Valuation Engine — calculation engine, repair components
+2. [x] FS-002 — Valuation Engine — calculation engine, repair components
        (read-only), scrap validation, recommendation logic (per FS-000,
-       SDD-000). Specification drafted (Status: Draft). **ISP-002
-       (Implementation Specification) drafted** — implementation
-       (EP-002/IMP-002) not yet started.
+       SDD-000). **EP-002/IMP-002 complete**: full backend
+       implementation (176/176 tests) plus a new Flutter client
+       (`mobile/bikevaluator_app`, first Flutter code in the
+       repository) covering Vehicle Selection → Repair Assessment →
+       Calculate → Result, validated end-to-end on the Android
+       emulator. Awaiting human review.
 3. [ ] FS-003 — Authentication — dealer/admin login, roles.
 4. [ ] FS-004 — Admin — back-office management of vehicle master, pricing, users.
 5. [ ] FS-005 — Subscription — plan/tier management for dealer access.

@@ -1,12 +1,27 @@
 # Full Path: src/vehicle_master/serializers/repair_component_serializers.py
 # Relative Path: serializers/repair_component_serializers.py
 # Module: vehicle_master
-# Purpose: Response serializers for GET /repairs/components.
+# Purpose: Query and response serializers for GET /repairs/components.
 # Author: AI Agent (Claude, Sonnet 5)
-# Related Documents: ISP-002 §2.3, API-001, NS-001 §7 (camelCase JSON)
+# Related Documents: ISP-002 §2.3, API-001, NS-001 §7 (camelCase JSON),
+#   IMP-003 (added year/variant_id query params - repair costs are now
+#   scoped per vehicle, so the endpoint can no longer be parameterless)
 """No business logic - field parsing/shaping only."""
 
 from rest_framework import serializers
+
+
+class RepairComponentListQuerySerializer(serializers.Serializer):
+    """
+    Query-param validation for ``GET /repairs/components`` (IMP-003).
+
+    Mirrors ``ConfigurationQuerySerializer`` deliberately - both
+    endpoints now need the same Year+Variant scope to resolve a
+    ValuationMaster.
+    """
+
+    year = serializers.IntegerField(required=True)
+    variant_id = serializers.UUIDField(required=True)
 
 
 class RepairOptionSerializer(serializers.Serializer):
@@ -21,9 +36,10 @@ class RepairOptionSerializer(serializers.Serializer):
 
 class RepairComponentSerializer(serializers.Serializer):
     """
-    Maps a component dict (assembled by the view from
-    ``RepairComponentRepository`` + ``RepairOptionRepository``) to
-    ISP-002 §2.3's ``RepairComponentDto`` shape.
+    Maps a component dict (assembled by
+    ``ValuationService.list_repair_components``, IMP-003 - deduction
+    amounts are scoped per vehicle, not assembled directly from the
+    repositories by the view) to ISP-002 §2.3's ``RepairComponentDto`` shape.
     """
 
     id = serializers.UUIDField()

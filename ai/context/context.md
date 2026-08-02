@@ -2,79 +2,82 @@
 
 **This is the first file every AI session must read.**
 
-**Last update:** 2026-08-02T00:00
+**Last update:** 2026-08-02T22:15
 
 ## Current Phase
 
-**IMP-001D approved (9.6/10)** — the architect considers Vehicle
-Master architecturally stable and did not request another refinement
-round. **ISP-002 — Valuation Engine Implementation Specification
-drafted** (`ai/architecture/isp/ISP-002-valuation-engine-
-implementation-specification.md`, Status: Draft), continuing the
-pipeline for FS-002.
+**IMP-003B (Engineering Stabilization Release) — final completion pass
+done.** Full 8-scenario Flutter emulator walkthrough completed (with
+screenshots); 100/1,000-row importer benchmarks re-measured cleanly;
+the 10,000-row benchmark run to completion in the background (see
+`docs/importer-README.md` for the figure); one leftover doc-drift item
+fixed; developer documentation split into 6 guides; a standalone Manual
+QA Checklist created. Vehicle Master, Valuation Engine, the real-data
+importer, and the Flutter
+client bootstrap are all considered stable and ready for the architect
+to freeze as the project's foundation. Future modules (FS-003
+Authentication, FS-004 Admin, Dealer Portal, Subscription, Payments)
+are expected to build on top of this baseline rather than modify it,
+per the architect's own stated intent.
 
-**Flagged discrepancy (same pattern as IMP-001A/FS-001):** ISP-002's
-commissioning message referred to FS-002 as "the approved FS-002," but
-`FS-002-valuation-engine.md`'s own Status field still reads `Draft` —
-no explicit closure statement like FS-001's "I consider FS-001 closed"
-has been given for it yet. Not silently resolved either way — ISP-002
-was still produced.
+## How we got here (chronological, most recent last)
 
-## Current Sprint
+1. **IMP-001A-D**: Vehicle Master backend foundation, service-layer
+   business logic, REST API, architecture refinement. Reviewed 9.6/10,
+   approved, considered stable.
+2. **FS-002 → ISP-002 → EP-002 → IMP-002**: Valuation Engine
+   functional spec, implementation spec, engineering package, and full
+   implementation (backend + first Flutter client, `mobile/
+   bikevaluator_app`). End-to-end validated on the Android emulator.
+3. **IMP-003**: imported the architect-supplied real "2W Valuation
+   Calc" spreadsheet (86 vehicle/year rows) into the database. Along
+   the way, discovered repair deduction amounts vary per Brand/Model/
+   Variant/Year - contradicting DBD-001 §9's original global
+   `repair_options.deduction_amount` design. Surfaced via
+   `AskUserQuestion` **before writing any import code**; architect chose
+   to scope costs per vehicle. Recorded as **`AI-0011`**, amending
+   DBD-001 §9/BR-0010. New `ValuationRepairCost` table, new idempotent/
+   transactional `import_valuation_master` management command.
+4. **IMP-003A**: architect-approved CTO-grade review of everything in
+   IMP-002/IMP-003. Found the core decision (vehicle-scoped costs) was
+   handled correctly, but flagged 2 High Priority and several Medium/
+   Low Priority engineering-quality gaps (stale API-001/ISP-002/EP-002
+   docs, no real audit trail, N+1 queries, a redundant DB index,
+   importer robustness gaps).
+5. **IMP-003B** (this round): closed every High Priority finding and
+   the cheap Medium ones. New real, persistent `AuditLogRepository`
+   (recorded as **`AI-0012`**, amending DBD-001 §2); N+1 queries fixed
+   in `ValuationService`; redundant index removed; importer hardened
+   (encoding fallback, thousands-separator tolerance, progress
+   reporting, structured `logging`); Flutter `ApiClient` centralized
+   with a request timeout and network/timeout/server/validation error
+   differentiation; API-001/ISP-002/EP-002 brought back in sync with
+   the actual `/repairs/components` contract; new tests throughout
+   (211 backend tests, 11 Flutter tests, all passing).
 
-Review of ISP-002. Next: EP-002 (Valuation Engine Engineering
-Package), following the same FS→ISP→EP→IMP pipeline as Vehicle Master.
+## Known, deliberately-carried-forward gaps (not fixed by design)
 
-## Current Objective
-
-Human reviews ISP-002 and confirms FS-002's Status explicitly. Key
-items: the new `RepairComponentRepository`/`RepairOptionRepository`
-(this ISP resolves FS-002's Open Question #1 — this module's future
-implementation creates these models, FS-004 extends them later, not
-duplicates); the API-001 snake_case-vs-camelCase wording inconsistency
-in `/valuation/calculate`'s response (resolved in favor of the
-camelCase convention already used everywhere else); and confirmation
-that `ValuationService` correctly has zero subscription-awareness
-(BR-0006 deferred entirely to the View layer, once FS-005 exists).
-
-## Last Completed Task
-
-Executed ISP-002: two new Service classes (`ValuationService` — BR-0001/
-BR-0002/BR-0009; `RecommendationService` — BR-0003/BR-0008, matching
-SSD-001's actor separation rather than one monolithic service), two new
-Repository interfaces (`RepairComponentRepository`/
-`RepairOptionRepository`, read-only — administration stays FS-004's per
-FS-001's own precedent), DTOs for `/valuation/calculate` and
-`/repairs/components`, a Validation Matrix, an Error Mapping table, an
-explicit Architecture Compliance Checklist (newly requested this
-round), and a Dependency Analysis table. Sequence diagrams: cited
-SSD-001 §3.3/§3.4 rather than re-drawn, per FSS-000 §5's own rule.
-Explicitly reused Vehicle Master's shared infrastructure where it
-genuinely applies (`api_utils.py`, `service_factory.py` extended with
-2 new builders) and explicitly did NOT force-reuse `ActorProvider`/
-`RequestContext`/`authorization.py`, since Valuation Engine has no
-Super-Admin-only write (no BR-0004 concern exists in this module) —
-flagged this distinction rather than mechanically applying every
-Vehicle Master pattern regardless of fit. Cross-cutting note recorded
-(not implemented): once this module's repositories exist, FS-001's
-`get_configuration` could return real repair options instead of an
-empty list — a follow-up task, not in this ISP's own scope.
-
-## Current Task
-
-Awaiting human review of ISP-002 and explicit confirmation of FS-002's
-Status.
-
-## Blockers
-
-None hard-blocking the review. Two of ISP-002's 4 Open Questions carry
-real weight before EP-002/implementation: the FS-005/BR-0006 deferral
-pattern (confirm the View-layer-gate design is right) and the two
-genuinely-undefined edge cases (MSP=0/Margin≥MSP; concurrent pricing
-edit during calculation).
+- **FS-003 (Authentication) doesn't exist.** The Flutter app starts
+  pre-authenticated via the backend's `DummyActorProvider` header
+  mechanism (`X-Actor-Id`/`X-Actor-Role`). This is the single largest
+  remaining structural gap in the whole project.
+- **FS-004 (Admin) doesn't exist** for Repair Component/Option/Cost
+  administration - the importer is currently the only way to write
+  that data, and it temporarily borrows write methods on
+  `RepairComponentRepository`/`RepairOptionRepository` that were
+  documented as read-only for every Dealer-facing view.
+- The Audit module lives inside `vehicle_master`, not the separate
+  `common/audit` Django app EP-001 §2 originally planned - flagged
+  twice now (IMP-002/EP-002's RepairComponent precedent, IMP-003B's
+  AuditLog), not yet acted on.
+- The importer has no bulk-write path - fine for the real ~86-row
+  spreadsheet, would need work before a much larger file (see
+  `docs/importer-README.md`'s benchmark table).
 
 ## Next Action
 
-Human reviews ISP-002. Once satisfied (and FS-002's Status is
-confirmed), draft EP-002 (Valuation Engine Engineering Package),
-following the same pipeline used for Vehicle Master.
+Awaiting the architect's decision to officially freeze this baseline
+(Architecture + Vehicle Master + Valuation Engine + Data Import +
+Flutter Client Bootstrap). Once frozen, the next module is expected to
+be FS-003 (Authentication) or FS-004 (Admin) - either would resolve one
+of the gaps listed above.

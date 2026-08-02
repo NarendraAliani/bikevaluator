@@ -69,15 +69,21 @@ FS-002, this endpoint is stateless.
 
 ### 1.2 `GET /repairs/components`
 
+**Amended by `AI-0011` (IMP-003, 2026-08-02):** deduction amounts are
+scoped per Year+Variant (`ValuationRepairCost`), not global per option -
+this endpoint now requires `year`/`variant_id` and can return
+`VAL003`/`E-PRICING-001` (found stale by the IMP-003A review; corrected
+here in IMP-003B).
+
 | Field | Value |
 |---|---|
 | Authentication | Required |
 | Authorization | Any authenticated Dealer |
 | Request Body | None |
-| Query Parameters | None |
-| Response Schema | `{ success, message, data: { components: RepairComponentDto[] } }` |
-| Error Codes | None beyond framework-level (401) |
-| Validation Rules | None (no input). |
+| Query Parameters | `year` (int, required), `variant_id` (UUID, required) |
+| Response Schema | `{ success, message, data: { components: RepairComponentDto[] } }` - `deductionAmount` per option is scoped to the resolved ValuationMaster |
+| Error Codes | `VAL003`/`E-PRICING-001` (404, no Active ValuationMaster for Year+Variant), 400 (missing/invalid query params), framework-level (401) |
+| Validation Rules | `year`/`variant_id` both required. |
 
 ---
 

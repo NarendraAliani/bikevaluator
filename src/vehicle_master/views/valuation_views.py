@@ -5,12 +5,17 @@
 #   calculation - thin transport over ValuationService/RecommendationService.
 # Author: AI Agent (Claude, Sonnet 5)
 # Related Documents: API-001 (/repairs/components, /valuation/calculate),
-#   ISP-002 §1, EP-002 §5, BRR-001 BR-0001/0002/0003/0005/0008/0009/0010
+#   ISP-002 §1, EP-002 §5, BRR-001 BR-0001/0002/0003/0005/0008/0009/0010,
+#   IMP-003 (repair costs now scoped per Year+Variant - see
+#   ValuationRepairCost's docstring - so /repairs/components now
+#   requires year/variant_id query params; a real, flagged API contract
+#   change, not a silent one)
 """
 Thin transport only - every method calls exactly one Service method
-(``ValuationService.calculate`` / repository reads for the component
-list). No business logic here - the formula, scrap floor, rounding, and
-recommendation banding all happen in the Service layer (EP-002 §2).
+(``ValuationService.list_repair_components`` / ``.calculate``). No
+business logic here - the formula, scrap floor, rounding, recommendation
+banding, and (as of IMP-003) the ValuationMaster-scoped repair-cost
+lookup all happen in the Service layer (EP-002 §2).
 
 No authorization check - confirmed no Super-Admin-only concern exists
 in this module (ISP-002 §title note); any authenticated Dealer may call
@@ -20,9 +25,9 @@ both endpoints.
 from rest_framework.views import APIView
 
 from vehicle_master.api_utils import success_response
-from vehicle_master.repositories import RepairComponentRepository, RepairOptionRepository
 from vehicle_master.serializers import (
     CalculateValuationRequestSerializer,
+    RepairComponentListQuerySerializer,
     RepairComponentSerializer,
     ValuationResultSerializer,
 )
@@ -30,18 +35,17 @@ from vehicle_master.service_factory import build_valuation_service
 
 
 class RepairComponentListView(APIView):
-    """``GET /repairs/components`` - lists components + their options."""
+    """``GET /repairs/components?year=&variant_id=`` - lists components + their vehicle-scoped options (IMP-003)."""
 
     def get(self, request):
-        component_repository = RepairComponentRepository()
-        option_repository = RepairOptionRepository()
+        query = RepairComponentListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        validated = query.validated_data
 
-        components = []
-        for component in component_repository.get_active():
-            options = option_repository.get_active_by_component(component.id)
-            components.append(
-                {"id": component.id, "name": component.name, "options": options}
-            )
+        service = build_valuation_service()
+        components = service.list_repair_components(
+            year=validated["year"], variant_id=validated["variant_id"]
+        )
 
         data = RepairComponentSerializer(components, many=True).data
         return success_response({"components": data})

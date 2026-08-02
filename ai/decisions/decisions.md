@@ -598,6 +598,104 @@ content) as part of Baseline v1.0 — see
   CTO-rubric self-assessment alongside the existing Rule 23
   self-assessment, starting with this EP-001 round.
 
+## AI-0011
+
+- **Timestamp:** 2026-08-02T00:00
+- **Context:** IMP-003 (importing the architect-supplied "2W Valuation
+  Calc" spreadsheet - the single source of truth for real pricing/repair
+  cost data) discovered that repair deduction amounts (Half/Full Engine,
+  Colour, Shock/Fork, Tyres, Gearbox, Clutch, Plastic) vary per
+  Brand/Model/Variant/Year in the real data - e.g. Full Engine Expense is
+  Rs.5000 for a 2012 Activa but Rs.8000 for a 2025 Shine CB. DBD-001 §9
+  (Approved, part of the ABL-001 architecture baseline) modeled
+  `repair_options.deduction_amount` as global per (component, option) -
+  that table cannot hold this data losslessly. Before writing any import
+  code, this was raised to the architect via an explicit question rather
+  than resolved unilaterally, per this project's standing rule to
+  surface architecture conflicts instead of silently redesigning.
+- **Decision:** Amend DBD-001 §9: introduce a new `valuation_repair_costs`
+  table scoping the ₹ deduction amount to one `(valuation_master_id,
+  repair_option_id)` pair - i.e. costs are now scoped per Year+Variant
+  pricing version, exactly like `minimum_selling_price`/`margin` already
+  are. `repair_options` becomes pure catalog identity (which options
+  exist for a component) with no amount of its own. No BR-0007-style
+  versioning was added to the new table - a superseded `ValuationMaster`
+  row keeps its own historical `ValuationRepairCost` rows untouched (the
+  FK is to the specific pricing-version id), so history is preserved for
+  free.
+- **Reasons:** Architect's explicit choice (option "Scope repair costs
+  per Vehicle Configuration") from an `AskUserQuestion` posed before any
+  import code was written; this was the option that preserves the real
+  spreadsheet data losslessly, at the cost of a genuine (but necessary)
+  schema change.
+- **Alternatives considered:** (a) Keep `repair_options` global,
+  aggregate the spreadsheet into one value per (component, option) -
+  rejected by the architect; would silently misrepresent real per-
+  vehicle pricing (e.g. a Honda and a TVS would wrongly get the same
+  repair deduction). (b) Pause all import work and run a full separate
+  ADR-style approval cycle before writing any code - rejected by the
+  architect in favor of proceeding directly with this decision recorded
+  alongside the implementation, per the "Recommended" option's own
+  framing.
+- **Consequences:** `RepairOption.deduction_amount` field removed
+  (migration `0007_create_valuation_repair_costs`); `ValuationService`
+  now depends on `ValuationRepairCostRepository` instead of reading
+  amounts off `RepairOptionRepository`; `GET /repairs/components` is a
+  **breaking API contract change** - it now requires `year`/`variant_id`
+  query params (previously parameterless) - documented as a flagged,
+  non-silent change in EP-002/IMP-003's Architecture Observations, not
+  a silent one. Any future repair-cost-related module (FS-004 Admin)
+  must write through this new per-vehicle table, not `repair_options`.
+
+## AI-0012
+
+- **Timestamp:** 2026-08-02T00:00
+- **Context:** IMP-003A's CTO-grade review (approved) flagged two High
+  Priority engineering-quality gaps: (1) the importer's bulk pricing-
+  data mutations left zero audit trail, since `service_factory` defaulted
+  to `NoOpAuditRepository`; (2) `RepairOption.deduction_amount`'s N+1
+  query patterns in `ValuationService`. IMP-003B ("Engineering
+  Stabilization Release") was commissioned specifically to close these
+  without adding features, changing business rules, or redesigning
+  architecture.
+- **Decision:** Implement the first concrete, persistent
+  `AuditLogRepository` (`PersistentAuditLogRepository` + `AuditLog`
+  model/table) and make it `service_factory`'s default, replacing
+  `NoOpAuditRepository`. Placed inside `vehicle_master` (not a separate
+  `common/audit` app EP-001 §2 originally planned), the same pragmatic
+  call already made for `RepairComponent`/`RepairOption`. Extended
+  `AuditLogRepository.create()`'s signature with five optional,
+  keyword-only fields (`action`, `correlation_id`, `request_id`,
+  `success`, `error_message`) rather than changing its five original
+  positional parameters, so all 11 existing
+  `VehicleMasterAdminService` call sites needed zero changes.
+  `correlation_id`/`request_id` are populated ambiently via a new
+  `audit_context.py` (Python `contextvars`) plus a new
+  `RequestIdMiddleware`, rather than threading two new parameters
+  through every write method.
+- **Reasons:** A real audit trail for financial/pricing-data mutations
+  is a compliance requirement, not an optional nicety, once the
+  importer is trusted as a repeatable data-loading path (per IMP-003A's
+  own finding). The additive-signature approach was chosen specifically
+  to satisfy this round's explicit "do not redesign architecture, only
+  improve engineering quality" instruction - a parameter-threading
+  redesign across 11 methods would have been exactly the kind of change
+  this round was commissioned to avoid.
+- **Alternatives considered:** (a) Move the Audit module to a new
+  `common/audit` Django app now, per EP-001 §2's original plan -
+  rejected as out of scope for a stabilization release (a new Django
+  app is a structural change, not an engineering-quality fix); deferred
+  to a future prompt. (b) Thread `correlation_id`/`request_id` as new
+  required parameters through every `VehicleMasterAdminService` method -
+  rejected in favor of the ambient-context approach for the same
+  "don't redesign" reason.
+- **Consequences:** Every Admin write (HTTP and the importer) now
+  creates a real, queryable `AuditLog` row. A future prompt should still
+  relocate this to `common/audit/` per EP-001 §2. `ValuationRepairCostRepository.
+  get_amounts`/`RepairOptionRepository.get_active_by_components` (batched
+  queries, replacing the N+1 patterns) are the corresponding Task 3 fix -
+  no schema or business-rule change, pure query-efficiency improvement.
+
 ## DEC-0001
 
 - **Timestamp:** 2026-08-02T00:00

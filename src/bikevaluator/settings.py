@@ -72,6 +72,9 @@ REST_FRAMEWORK = {
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # IMP-003B Task 2: assigns request_id (from X-Request-Id, or a new
+    # UUID) to every request, for audit records - no view code changes.
+    "vehicle_master.middleware.RequestIdMiddleware",
 ]
 
 ROOT_URLCONF = "bikevaluator.urls"
@@ -114,3 +117,39 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# IMP-003B Task 8: structured logging via Python's `logging` module -
+# the importer must not rely on stdout alone. Console handler keeps
+# interactive `manage.py` output; the file handler gives a durable,
+# grep-able record independent of whatever captured stdout.
+LOG_DIR = BASE_DIR.parent / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "structured": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "structured",
+        },
+        "import_file": {
+            "class": "logging.FileHandler",
+            "filename": str(LOG_DIR / "import.log"),
+            "formatter": "structured",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "vehicle_master.import": {
+            "handlers": ["console", "import_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

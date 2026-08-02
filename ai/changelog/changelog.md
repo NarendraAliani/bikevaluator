@@ -4,6 +4,289 @@ Newest entries at the top.
 
 ---
 
+## 2026-08-02T22:15 — IMP-003B Final Completion Pass
+
+Closed the remaining items from IMP-003B's own Task list that the first
+pass left open, per the architect's explicit "complete every remaining
+task" instruction.
+
+**Full 8-scenario Flutter emulator walkthrough**, with screenshots:
+successful valuation (with a repair deduction), a second successful
+valuation with an empty repair assessment (0 deductions, confirming
+that path independently), pricing-unavailable (VAL003), invalid input
+(Year field cleared - confirmed the Next button stays functionally
+disabled despite a low-contrast visual style, a UX observation not a
+defect), network/backend-down (backend process stopped, app relaunched
+cold), retry-recovery (backend restarted, Retry tapped, form recovered
+cleanly), and a genuine request timeout (temporarily pointed
+`kApiBaseUrl` at a non-routable address with a shortened
+`kRequestTimeout` for a fast, controlled reproduction - reverted
+immediately after capture, confirmed clean via `git diff`). API
+validation failure was confirmed directly against the backend (curl)
+since the Flutter client's own input constraints correctly prevent
+malformed requests from ever being constructed through the UI - a
+positive defense-in-depth finding, not a test gap.
+
+**Benchmark**: 100 rows (17.6s) and 1,000 rows (272.5s) re-measured
+against a clean, isolated, freshly-migrated SQLite database (all-new
+rows, no mixing with prior "unchanged" rows as in the earlier pass).
+Per-row query count measured directly on a small sample: ~114
+queries/row, confirming the no-bulk-writes finding numerically. The
+10,000-row run was launched as a true background task (not a blocking
+foreground call) specifically to avoid the tool-timeout-kill pattern
+that corrupted the database during IMP-003B's first benchmark attempt.
+
+**Documentation**: found and fixed one leftover drift item IMP-003A had
+flagged but IMP-003B's first pass missed - a stale docstring in
+`repair_component_serializers.py` still describing the old (pre-IMP-003)
+assembly path. Developer documentation restructured from one combined
+file into 6 separate guides per the architect's request: `docs/
+importer-README.md` (index), `developer-guide.md`,
+`troubleshooting-guide.md`, `recovery-guide.md` (now includes the
+benchmark corruption incident as a documented, on-the-record case),
+`rollback-guide.md`, `testing-guide.md`. New standalone `docs/
+manual-qa-checklist.md`.
+
+---
+
+## 2026-08-02T21:00 — IMP-003B: Engineering Stabilization Release
+
+Commissioned to close every High Priority (and cheap Medium Priority)
+finding from IMP-003A's architect-approved review, with no new business
+features, no business-rule changes, and no architecture redesign.
+
+**Task 2 (Real Audit Repository)** — new `AuditLog` model/table
+(migration `0008_create_audit_logs`), `PersistentAuditLogRepository`
+replacing `NoOpAuditRepository` as `service_factory`'s default. Every
+Admin write path (HTTP and the importer) now creates a real, queryable
+audit record. Recorded as **`AI-0012`**, amending DBD-001 §2.
+`AuditLogRepository.create()`'s signature gained five optional,
+keyword-only fields (`action`, `correlation_id`, `request_id`,
+`success`, `error_message`) rather than changing its five original
+positional parameters - all 11 existing `VehicleMasterAdminService`
+call sites needed zero changes. `correlation_id`/`request_id` are
+populated ambiently via a new `audit_context.py` (Python `contextvars`)
+plus a new `RequestIdMiddleware`, deliberately avoiding a parameter-
+threading redesign across every write method.
+
+**Task 3 (Performance)** — `ValuationRepairCostRepository.get_amounts`
+and `RepairOptionRepository.get_active_by_components` batch what were
+previously per-option and per-component queries (N+1) into one query
+each. Regression-guarded with `assertNumQueries` so this can't silently
+regress back to N+1 later.
+
+**Task 4 (Database Optimization)** — removed the redundant
+`idx_valrepaircost_master` index on `ValuationRepairCost` - the
+`UniqueConstraint` on `(valuation_master, repair_option)` already
+creates a composite index usable for a `valuation_master_id`-only
+filter, so the standalone index was pure write-time overhead for zero
+read benefit.
+
+**Task 5 (Importer Hardening)** — encoding fallback (tries UTF-8 with
+BOM, then Windows-1252, the default Excel-on-Windows export encoding,
+instead of crashing on the first `UnicodeDecodeError`); thousands-
+separator tolerance (`"45,000"` no longer fails to parse); progress
+logged every 500 rows; every run now goes through Python's `logging`
+module (`vehicle_master.import` logger, console + `logs/import.log`),
+not stdout alone.
+
+**Task 6 (Developer Experience)** — new `docs/importer-README.md`:
+example commands, a troubleshooting table, a measured execution-time
+benchmark, and a recovery/rollback procedure (including what to do if
+an interrupted run corrupts a SQLite file - see the incident below).
+
+**Task 7 (Flutter)** — `ApiClient.instance` singleton replacing
+per-screen instantiation; a 15-second request timeout (`kRequestTimeout`,
+overridable per-instance for tests) so a hung connection reaches the
+same error/retry UI a refused one already did; `ApiErrorCategory`
+(network/timeout/server/validation/unknown) with a distinct
+`userFriendlyMessage` per category, replacing one generic error string.
+
+**Task 8 (Logging)** — `settings.LOGGING` configured (console +
+file handler); the importer logs start/completion/progress/row-level
+warnings structurally, not just via `self.stdout.write`.
+
+**Task 9 (Testing)** — 8 new backend tests (`test_audit_logging.py` -
+persistence, action inference, ambient correlation_id/request_id,
+success/error_message fields, HTTP- and importer-driven audit creation);
+2 new N+1 regression tests (`assertNumQueries`); 5 new importer
+robustness tests (thousands separator, Windows-1252 encoding, larger
+multi-batch import with progress assertions, sequential-reimport
+idempotency); 6 new Flutter tests (timeout, network/server/validation
+categorization, retry-recovery). **211 backend tests + 11 Flutter
+tests, all passing.**
+
+**Task 10 (Benchmark)** — measured 100 rows (~29s) and 1,000 rows
+(~381s) against the real disk-backed SQLite dev database (not the
+faster in-memory-style test database Django's test runner uses).
+**Incident**: the planned 10,000-row run was killed by a tool timeout
+mid-write, corrupting the working `db.sqlite3` (`PRAGMA integrity_check`
+failed) - cleanly restored from a pre-benchmark backup, confirmed
+healthy. The 10k figure in the importer README is therefore an
+**extrapolation**, not a direct measurement - documented as such, and as
+a real illustration of why DBD-001 mandates PostgreSQL (WAL-based
+durability doesn't have this failure mode) for production.
+
+**Task 11 (Simulation)** — `manage.py check`/`migrate`/`test`,
+`flutter clean`/`pub get`/`analyze`/`test` all clean. Re-verified the
+full Dealer journey live on the `Pixel_6_API_35` Android emulator with
+real imported data: Honda Activa 6g (2022), Gearbox FULL deduction
+selected -> Rs.36500, GOOD (45000-5000-3500=36500, 81.1% of MSP).
+
+**Task 1/12 (Documentation/Governance sync)** — API-001, ISP-002, and
+EP-002 (all three flagged stale by IMP-003A for describing
+`/repairs/components` as parameterless) corrected to match the actual
+`year`/`variant_id`-requiring contract. `context.md` and
+`prompt-history.md` - found to have drifted stale across the last 2-3
+rounds (EP-002 through IMP-003A were never reflected) - brought fully
+current in this pass, not just incrementally appended to.
+
+---
+
+## 2026-08-02T20:00 — IMP-003A: CTO-Grade Engineering Review (approved)
+
+Comprehensive review (architecture, database, importer, services, API,
+Flutter, performance, security, code quality, tests, documentation) of
+every file touched by IMP-002/IMP-003, delivered as a chat report per
+its explicit "review only, do not modify code" instruction.
+
+Judged the core `AI-0011` decision (vehicle-scoped repair costs) sound -
+surfaced before coding, not silently redesigned. Found 2 High Priority
+gaps: (1) API-001/ISP-002/EP-002 left stale after the `/repairs/
+components` contract change; (2) the importer's bulk pricing-data
+mutations left zero audit trail, since `service_factory` defaulted to
+`NoOpAuditRepository`. Several Medium/Low findings: N+1 query patterns
+in `ValuationService`, one redundant DB index, importer robustness gaps
+(no thousands-separator/encoding tolerance, no structured logging, no
+bulk writes), Flutter `ApiClient` instantiated per-screen with no
+timeout. 11-dimension CTO scorecard delivered (Architecture 8,
+Code Quality 8, Database 8, API 7, Flutter 7, Performance 7, Security 6,
+Documentation 6, Test Quality 8, Maintainability 8, Production
+Readiness 6). Recommended **not yet** freezing IMP-003, pending one
+short fix-up pass - approved by the architect, who commissioned
+IMP-003B to close the findings.
+
+---
+
+## 2026-08-02T00:00 — IMP-003: Real valuation master data import + DBD-001 §9 amendment (`AI-0011`)
+
+**Architecture conflict surfaced and resolved before writing import
+code**: the architect-supplied "2W Valuation Calc" spreadsheet (single
+source of truth for real pricing/repair-cost data) showed repair
+deduction amounts vary per Brand/Model/Variant/Year - directly
+contradicting DBD-001 §9's global `repair_options.deduction_amount`
+design. Raised via `AskUserQuestion` before any code was written;
+architect chose to scope repair costs per Vehicle Configuration. Recorded
+as **`AI-0011`**, amending DBD-001 §9 and BR-0010.
+
+**Schema**: new `ValuationRepairCost` model/table (migration
+`0007_create_valuation_repair_costs`) scoping each ₹ deduction amount to
+one `(valuation_master_id, repair_option_id)` pair; `RepairOption.
+deduction_amount` field removed - `RepairOption` is now pure catalog
+identity. `GET /repairs/components` is a flagged, non-silent **breaking
+API contract change**: now requires `year`/`variant_id` query params
+(mirrors `GET /vehicles/configuration`'s existing pattern) and returns
+VAL003/E-PRICING-001 if no pricing exists for that vehicle, same as
+`/valuation/calculate`.
+
+**Importer**: new idempotent, transactional, validated Django management
+command `import_valuation_master` (`--file`, `--dry-run`). Reuses
+`VehicleMasterAdminService` for every write (BR-0004/BR-0011/BR-0007
+all enforced exactly as a real Super Admin request would be - the
+importer never bypasses them); acts as a system Actor
+(`role="super_admin"`) since FS-003 still doesn't exist. Column→
+(RepairComponent, option_name) mapping is structural metadata only - no
+₹ value is ever hardcoded in the command itself, every amount is read
+from the spreadsheet at import time.
+
+**Import results** (`data/imports/2w-valuation-calc.csv`, 86 data rows):
+86 ValuationMaster rows created, 860 ValuationRepairCost rows written, 0
+failures, 0 duplicates. Re-running is a true no-op (86 "unchanged", 0
+new Brand/Model/Variant rows) - verified by running the importer twice
+and by dedicated `test_import_valuation_master.py` coverage (idempotency,
+validation, transactional row isolation, dry-run).
+
+**Assumptions documented, not silently resolved**: (1) Scrap Value has
+no column in the spreadsheet - defaulted to Rs.0.00, to be corrected by
+an Admin via the existing pricing-edit endpoint later. (2) Single-value
+repair columns (Shock/Fork, Tyres, Gearbox, Clutch) map to a single
+`FULL` option each, matching how Tyres was already modeled in EP-002's
+seed data. (3) "Shock/Fork" is a new RepairComponent name not in
+DBD-001 §9's original example list - treated as a normal catalog
+extension (that list was already described as extensible).
+
+**Verification**: 194/194 backend tests pass (8 new for the importer),
+`makemigrations --check`/`migrate` clean, `flutter analyze`/`flutter
+test` clean after updating the Flutter data source to pass `year`/
+`variantId`. Full HTTP contract verified live against the real imported
+data (Configuration load → Repair Components with real vehicle-scoped
+amounts → Calculate → correct price/label, plus VAL003 on both
+endpoints for an unpriced vehicle/year). Interactive Android-emulator
+walkthrough was interrupted repeatedly by the emulator process being
+torn down by the sandbox itself (unrelated to app behavior, same
+pattern seen in the EP-002 round) - documented as a tooling limitation,
+not a code defect, since the underlying HTTP contract the Flutter app
+calls was verified directly.
+
+---
+
+## 2026-08-02T00:00 — EP-002 + IMP-002: Valuation Engine Engineering Package, full implementation, and Flutter client bootstrap
+
+**EP-002** written following the Vehicle Master precedent exactly:
+Presentation/Service/Repository/Domain layers, `service_factory`,
+`api_utils`, centralized exception handling, DTOs, DI pattern, test
+conventions, response envelope, all reused unchanged. Three deliberate
+judgment calls recorded as Architecture Observations rather than silent
+architecture changes: (1) new files placed inside the existing
+`vehicle_master` Django app rather than a new app, a project-layout
+pragmatism; (2) Flutter state management chosen as plain
+`StatefulWidget`/`setState` for this build only, leaving the
+longer-standing state-management question still open; (3) no "Dealer
+Login" screen built — FS-003 (Authentication) has no specification or
+implementation anywhere in the repository, so the app starts
+pre-authenticated via the backend's existing `DummyActorProvider`
+header mechanism.
+
+**IMP-002 — full implementation**, backend: `RepairComponent`/
+`RepairOption` models (2 migrations, migration-per-model discipline
+preserved), read-only `RepairComponentRepository`/
+`RepairOptionRepository`, `RecommendationService` (BR-0003/BR-0008
+banding) and `ValuationService` (BR-0001 formula, BR-0002 scrap floor,
+BR-0009 rounding, BR-0005 `PricingNotAvailableError`/VAL003),
+`service_factory` extended with 2 new builders, serializers/views/urls
+for `GET /repairs/components` and `POST /valuation/calculate`
+(camelCase per NS-001 §7, consciously overriding API-001's own literal
+snake_case example, per ISP-002 §1.1). 5 new test files; full suite is
+176/176 passing after `makemigrations --check`, `migrate`, and
+`manage.py test`.
+
+**IMP-002 — Flutter client**, first Flutter code in this repository:
+bootstrapped via `flutter create` at `mobile/bikevaluator_app`;
+`ApiClient` (base URL `http://10.0.2.2:8000/api/v1` for Android-emulator
+networking, `X-Actor-Id`/`X-Actor-Role` header injection, envelope
+parsing, typed `ApiException`); Vehicle Selector, Repair Assessment,
+and Result screens covering the full Dealer journey; 6 tests, `flutter
+analyze` clean.
+
+**End-to-end emulator validation**: launched the Django dev server and
+the `Pixel_6_API_35` emulator, walked the full journey (Vehicle
+Selection → Repair Assessment → Calculate → Result, ₹42000/GOOD for the
+seeded Honda Activa 125 Standard scenario), confirmed back navigation
+preserves state, confirmed the VAL003 pricing-unavailable path shows a
+distinct message without crashing, and confirmed a real network failure
+degrades gracefully with a Retry action.
+
+**One real defect found during self-review and fixed before this
+report**: the Vehicle Selector screen's initial brand-load failure path
+checked `_brands.isEmpty` before checking `_errorMessage`, so a genuine
+network error was masked and displayed as "No brands available yet." —
+misleading the dealer into thinking the catalog was empty rather than
+that the connection had failed. Fixed by checking the error state first
+and adding a Retry action; re-verified live against a stopped-then-
+restarted backend.
+
+---
+
 ## 2026-08-02T00:00 — IMP-001D Review (9.6/10, APPROVED) + ISP-002 Valuation Engine Implementation Specification
 
 **IMP-001D reviewed and APPROVED**: 9.6/10. "This is now much closer to

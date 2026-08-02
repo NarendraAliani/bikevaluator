@@ -23,6 +23,7 @@ from vehicle_master.serializers.configuration_serializer import (
     RepairOptionGroupSerializer,
 )
 from vehicle_master.serializers.repair_component_serializers import (
+    RepairComponentListQuerySerializer,
     RepairComponentSerializer,
     RepairOptionSerializer,
 )
@@ -53,6 +54,7 @@ __all__ = [
     "ValuationMasterSerializer",
     "RepairComponentSerializer",
     "RepairOptionSerializer",
+    "RepairComponentListQuerySerializer",
     "RepairAssessmentEntrySerializer",
     "CalculateValuationRequestSerializer",
     "ValuationResultSerializer",

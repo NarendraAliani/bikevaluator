@@ -1,7 +1,8 @@
 // Full Path: lib/features/valuation_engine/data/datasources/valuation_remote_data_source.dart
 // Purpose: HTTP calls for the Repair Assessment + Calculate steps of the
 //   Dealer journey - thin transport only, no business logic.
-// Related Documents: API-001, ISP-002, EP-002
+// Related Documents: API-001, ISP-002, EP-002, IMP-003 (repair costs are
+//   now scoped per vehicle - /repairs/components requires year/variantId)
 import '../../../../core/api_client.dart';
 import '../models/repair_component_dto.dart';
 import '../models/valuation_result_dto.dart';
@@ -11,8 +12,14 @@ class ValuationRemoteDataSource {
 
   final ApiClient _client;
 
-  Future<List<RepairComponentDto>> getRepairComponents() async {
-    final data = await _client.get('/repairs/components');
+  Future<List<RepairComponentDto>> getRepairComponents({
+    required int year,
+    required String variantId,
+  }) async {
+    final data = await _client.get('/repairs/components', query: {
+      'year': year.toString(),
+      'variant_id': variantId,
+    });
     return (data['components'] as List)
         .map((json) => RepairComponentDto.fromJson(json as Map<String, dynamic>))
         .toList();

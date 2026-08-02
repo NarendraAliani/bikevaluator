@@ -39,6 +39,12 @@ class ModelRepository:
             queryset = queryset.exclude(id=exclude_id)
         return queryset.exists()
 
+    def get_by_name(self, brand_id: uuid.UUID, model_name: str) -> Optional[Model]:
+        """Return a single active Model by exact name under a Brand, or ``None`` (IMP-003's importer)."""
+        return Model.objects.filter(
+            brand_id=brand_id, model_name=model_name, active=True
+        ).first()
+
     def create(self, brand_id: uuid.UUID, model_name: str) -> Model:
         """Persist a new Model row under the given Brand."""
         return Model.objects.create(brand_id=brand_id, model_name=model_name)

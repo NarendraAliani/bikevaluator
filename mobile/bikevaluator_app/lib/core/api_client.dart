@@ -1,9 +1,14 @@
 // Full Path: lib/core/api_client.dart
 // Module: bikevaluator_app / core
-// Purpose: Single HTTP client wrapper - base URL, actor headers, and
-//   response-envelope parsing (API-000 v1.1), shared by every feature.
-// Related Documents: API-000 v1.1, API-001, EP-002 Architecture Observation #3
+// Purpose: Single HTTP client wrapper - base URL, actor headers,
+//   response-envelope parsing (API-000 v1.1), request timeout, and
+//   failure-category classification, shared by every feature.
+// Related Documents: API-000 v1.1, API-001, EP-002 Architecture
+//   Observation #3, IMP-003B Task 7 (timeout, centralized instance,
+//   network/server/validation/timeout differentiation)
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -20,8 +25,23 @@ const String kApiBaseUrl = 'http://10.0.2.2:8000/api/v1';
 const String kDummyActorId = '11111111-1111-1111-1111-111111111111';
 const String kDummyActorRole = 'dealer';
 
+/// IMP-003B Task 7: no HTTP call may hang indefinitely - a slow/dead
+/// connection must reach the same error/retry UI a refused connection
+/// already did, instead of leaving a screen stuck on its loading spinner.
+const Duration kRequestTimeout = Duration(seconds: 15);
+
 class ApiClient {
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({http.Client? client, Duration? timeout})
+      : _client = client ?? http.Client(),
+        _timeout = timeout ?? kRequestTimeout;
+
+  final Duration _timeout;
+
+  /// IMP-003B Task 7 ("centralize ApiClient creation"): one shared
+  /// instance for the whole app, instead of every screen constructing
+  /// its own. Screens should use this; tests keep constructing their
+  /// own `ApiClient(client: MockClient(...))` for isolation.
+  static final ApiClient instance = ApiClient();
 
   final http.Client _client;
 
@@ -33,15 +53,40 @@ class ApiClient {
 
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
     final uri = Uri.parse('$kApiBaseUrl$path').replace(queryParameters: query);
-    final response = await _client.get(uri, headers: _headers);
+    final response = await _send(() => _client.get(uri, headers: _headers));
     return _parseEnvelope(response);
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('$kApiBaseUrl$path');
-    final response =
-        await _client.post(uri, headers: _headers, body: jsonEncode(body));
+    final response = await _send(
+      () => _client.post(uri, headers: _headers, body: jsonEncode(body)),
+    );
     return _parseEnvelope(response);
+  }
+
+  Future<http.Response> _send(Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(_timeout);
+    } on TimeoutException {
+      throw ApiException(
+        code: 'E-TIMEOUT-000',
+        message: 'The request took too long to complete.',
+        category: ApiErrorCategory.timeout,
+      );
+    } on SocketException {
+      throw ApiException(
+        code: 'E-NETWORK-000',
+        message: 'Could not reach the server - check your connection.',
+        category: ApiErrorCategory.network,
+      );
+    } on http.ClientException {
+      throw ApiException(
+        code: 'E-NETWORK-000',
+        message: 'Could not reach the server - check your connection.',
+        category: ApiErrorCategory.network,
+      );
+    }
   }
 
   dynamic _parseEnvelope(http.Response response) {
@@ -52,6 +97,7 @@ class ApiClient {
       throw ApiException(
         code: 'E-NETWORK-000',
         message: 'Unexpected response from server (status ${response.statusCode}).',
+        category: response.statusCode >= 500 ? ApiErrorCategory.server : ApiErrorCategory.unknown,
       );
     }
 
@@ -66,6 +112,13 @@ class ApiClient {
       message: (first?['message'] as String?) ??
           envelope['message'] as String? ??
           'Request failed.',
+      category: _categoryForStatus(response.statusCode),
     );
+  }
+
+  ApiErrorCategory _categoryForStatus(int statusCode) {
+    if (statusCode >= 500) return ApiErrorCategory.server;
+    if (statusCode >= 400) return ApiErrorCategory.validation;
+    return ApiErrorCategory.unknown;
   }
 }

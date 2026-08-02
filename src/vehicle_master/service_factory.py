@@ -34,9 +34,11 @@ from vehicle_master.repositories import (
     AuditLogRepository,
     BrandRepository,
     ModelRepository,
-    NoOpAuditRepository,
+    PersistentAuditLogRepository,
+    RepairComponentRepository,
     RepairOptionRepository,
     ValuationMasterRepository,
+    ValuationRepairCostRepository,
     VariantRepository,
 )
 from vehicle_master.services.recommendation_service import RecommendationService
@@ -62,16 +64,18 @@ def build_vehicle_master_admin_service(
 ) -> VehicleMasterAdminService:
     """
     Construct a ``VehicleMasterAdminService`` with its repository
-    dependencies. Defaults to ``NoOpAuditRepository`` - no real Audit
-    module exists yet (IMP-001A/B/C). Pass a real implementation once
-    one exists; no view changes required either way.
+    dependencies. Defaults to ``PersistentAuditLogRepository`` (IMP-003B
+    Task 2) - every Admin write path now creates a real, queryable audit
+    record. ``NoOpAuditRepository`` still exists (e.g. for tests that
+    want to skip audit-table writes entirely) - pass it explicitly if
+    needed; no view changes required either way.
     """
     return VehicleMasterAdminService(
         brand_repository=BrandRepository(),
         model_repository=ModelRepository(),
         variant_repository=VariantRepository(),
         valuation_master_repository=ValuationMasterRepository(),
-        audit_log_repository=audit_log_repository or NoOpAuditRepository(),
+        audit_log_repository=audit_log_repository or PersistentAuditLogRepository(),
     )
 
 
@@ -84,6 +88,8 @@ def build_valuation_service() -> ValuationService:
     """Construct a ``ValuationService`` with its repository/service dependencies."""
     return ValuationService(
         valuation_master_repository=ValuationMasterRepository(),
-        repair_option_repository=RepairOptionRepository(),
+        repair_component_repository=RepairComponentRepository(),
+        valuation_repair_cost_repository=ValuationRepairCostRepository(),
         recommendation_service=build_recommendation_service(),
+        repair_option_repository=RepairOptionRepository(),
     )

@@ -11,7 +11,14 @@ import uuid
 
 from rest_framework.test import APITestCase
 
-from vehicle_master.models import Brand, Model, RepairComponent, RepairOption, Variant
+from vehicle_master.models import (
+    Brand,
+    Model,
+    RepairComponent,
+    RepairOption,
+    ValuationRepairCost,
+    Variant,
+)
 
 API_PREFIX = "/api/v1"
 SUPER_ADMIN_HEADERS = {"HTTP_X_ACTOR_ROLE": "super_admin", "HTTP_X_ACTOR_ID": str(uuid.uuid4())}
@@ -82,19 +89,25 @@ class FullValuationEngineLifecycleIntegrationTest(APITestCase):
         )
         self.assertEqual(configuration.status_code, 200)
 
-        # 5. Dealer browses the Repair Component catalog - empty at this point.
-        empty_components = self.client.get(f"{API_PREFIX}/repairs/components")
+        # 5. Dealer browses the Repair Component catalog (now vehicle-scoped,
+        # IMP-003) - empty at this point.
+        repairs_query = {"year": 2022, "variant_id": variant_id}
+        empty_components = self.client.get(f"{API_PREFIX}/repairs/components", repairs_query)
         self.assertEqual(empty_components.data["data"]["components"], [])
 
-        # 6. A Repair Component + Option are seeded directly (FS-004's future
-        # concern is administering these via API - not built in this module).
+        # 6. A Repair Component + Option + vehicle-scoped cost are seeded
+        # directly (FS-004's future concern is administering these via
+        # API - not built in this module).
         component = RepairComponent.objects.create(name="Engine")
-        option = RepairOption.objects.create(
-            repair_component=component, option_name="PARTIAL", deduction_amount="3000.00"
+        option = RepairOption.objects.create(repair_component=component, option_name="PARTIAL")
+        ValuationRepairCost.objects.create(
+            valuation_master_id=pricing_response.data["data"]["id"],
+            repair_option=option,
+            deduction_amount="3000.00",
         )
 
         # 7. Dealer re-browses the Repair Component catalog - now populated.
-        components = self.client.get(f"{API_PREFIX}/repairs/components")
+        components = self.client.get(f"{API_PREFIX}/repairs/components", repairs_query)
         self.assertEqual(len(components.data["data"]["components"]), 1)
         self.assertEqual(
             components.data["data"]["components"][0]["options"][0]["optionName"], "PARTIAL"

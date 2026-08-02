@@ -41,6 +41,12 @@ class VariantRepository:
             queryset = queryset.exclude(id=exclude_id)
         return queryset.exists()
 
+    def get_by_name(self, model_id: uuid.UUID, variant_name: str) -> Optional[Variant]:
+        """Return a single active Variant by exact name under a Model, or ``None`` (IMP-003's importer)."""
+        return Variant.objects.filter(
+            model_id=model_id, variant_name=variant_name, active=True
+        ).first()
+
     def create(self, model_id: uuid.UUID, variant_name: str) -> Variant:
         """Persist a new Variant row under the given Model."""
         return Variant.objects.create(model_id=model_id, variant_name=variant_name)

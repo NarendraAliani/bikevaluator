@@ -35,6 +35,10 @@ class BrandRepository:
             queryset = queryset.exclude(id=exclude_id)
         return queryset.exists()
 
+    def get_by_name(self, brand_name: str) -> Optional[Brand]:
+        """Return a single active Brand by exact name, or ``None`` (used by IMP-003's importer)."""
+        return Brand.objects.filter(brand_name=brand_name, active=True).first()
+
     def create(self, brand_name: str) -> Brand:
         """Persist a new Brand row. No validation performed here (Service layer's job)."""
         return Brand.objects.create(brand_name=brand_name)

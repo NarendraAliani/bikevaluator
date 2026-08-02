@@ -198,8 +198,12 @@ IMP-001D). This is documented, not silently assumed.
 
 ### Endpoint Implementation Order
 
-1. `GET /repairs/components` (read, no dependencies beyond the new
-   repositories).
+1. `GET /repairs/components?year=&variant_id=` (read, depends on the
+   new `ValuationRepairCost` repository - **amended by `AI-0011`/
+   IMP-003**: costs are scoped per Year+Variant, so this endpoint now
+   requires the same two query params as `/vehicles/configuration` and
+   can return `VAL003`. This section was stale after IMP-003 shipped
+   the amendment; corrected in IMP-003B).
 2. `POST /valuation/calculate` (depends on #1's data existing, and on
    `ValuationMasterRepository`, reused).
 

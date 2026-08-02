@@ -42,7 +42,7 @@ class _VehicleSelectorScreenState extends State<VehicleSelectorScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = VehicleSelectorController(VehicleMasterRemoteDataSource(ApiClient()));
+    _controller = VehicleSelectorController(VehicleMasterRemoteDataSource(ApiClient.instance));
     _loadBrands();
   }
 
@@ -66,12 +66,12 @@ class _VehicleSelectorScreenState extends State<VehicleSelectorScreen> {
     } on ApiException catch (e) {
       setState(() {
         _loadingBrands = false;
-        _errorMessage = e.message;
+        _errorMessage = e.userFriendlyMessage;
       });
     } catch (_) {
       setState(() {
         _loadingBrands = false;
-        _errorMessage = 'Network error - check your connection and try again.';
+        _errorMessage = 'An unexpected error occurred. Please try again.';
       });
     }
   }
@@ -96,12 +96,12 @@ class _VehicleSelectorScreenState extends State<VehicleSelectorScreen> {
     } on ApiException catch (e) {
       setState(() {
         _loadingModels = false;
-        _errorMessage = e.message;
+        _errorMessage = e.userFriendlyMessage;
       });
     } catch (_) {
       setState(() {
         _loadingModels = false;
-        _errorMessage = 'Network error - check your connection and try again.';
+        _errorMessage = 'An unexpected error occurred. Please try again.';
       });
     }
   }
@@ -124,12 +124,12 @@ class _VehicleSelectorScreenState extends State<VehicleSelectorScreen> {
     } on ApiException catch (e) {
       setState(() {
         _loadingVariants = false;
-        _errorMessage = e.message;
+        _errorMessage = e.userFriendlyMessage;
       });
     } catch (_) {
       setState(() {
         _loadingVariants = false;
-        _errorMessage = 'Network error - check your connection and try again.';
+        _errorMessage = 'An unexpected error occurred. Please try again.';
       });
     }
   }
@@ -171,12 +171,12 @@ class _VehicleSelectorScreenState extends State<VehicleSelectorScreen> {
         _submitting = false;
         _errorMessage = e.isPricingUnavailable
             ? 'Pricing is not available for this vehicle/year yet.'
-            : e.message;
+            : e.userFriendlyMessage;
       });
     } catch (_) {
       setState(() {
         _submitting = false;
-        _errorMessage = 'Network error - check your connection and try again.';
+        _errorMessage = 'An unexpected error occurred. Please try again.';
       });
     }
   }
@@ -192,7 +192,23 @@ class _VehicleSelectorScreenState extends State<VehicleSelectorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_brands.isEmpty)
+                  if (_brands.isEmpty && _errorMessage != null)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          key: const Key('retry_brands_button'),
+                          onPressed: _loadBrands,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    )
+                  else if (_brands.isEmpty)
                     const Text('No brands available yet.')
                   else ...[
                     TextField(

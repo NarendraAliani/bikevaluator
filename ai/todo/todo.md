@@ -17,8 +17,11 @@ IMP-001A (Backend Foundation, 10/10 CTO-approved, frozen), IMP-001B
 layer, 143 tests total) are complete at `src/`. All 8 Vehicle Master
 endpoints are live over HTTP at `/api/v1/`.
 
-**Valuation** now has real, active tasks (FS-002 drafted) — no longer a
-placeholder; see `ai/todo/modules/valuation.md`.
+**Valuation** — FS-002 → ISP-002 → EP-002 → IMP-002 → IMP-003 → IMP-003A
+(review) → IMP-003B (stabilization) all complete as of 2026-08-02; see
+`ai/todo/modules/valuation.md`. Backend + Flutter client both fully
+implemented, real spreadsheet data imported (86 rows), audit trail
+real, N+1 queries fixed. Awaiting the architect's freeze decision.
 
 | Module | File | Status |
 |---|---|---|
